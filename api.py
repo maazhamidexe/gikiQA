@@ -8,7 +8,7 @@ from pinecone import Pinecone
 from langchain_pinecone import PineconeVectorStore
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
-
+from fastapi.middleware.cors import CORSMiddlewarefrom fastapi.middleware.cors import CORSMiddleware
 # ---------- Load environment ----------
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -76,6 +76,16 @@ qa = RetrievalQA.from_chain_type(
 
 # ---------- FastAPI ----------
 app = FastAPI(title="GIKI Chatbot API", version="1.0")
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://gikichatbot.vercel.app/","https://gikichatbot.vercel.app/chat"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class QueryRequest(BaseModel):
     query: str

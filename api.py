@@ -99,6 +99,22 @@ app.add_middleware(
 class QueryRequest(BaseModel):
     query: str
 
+# Add explicit OPTIONS handlers for CORS preflight requests
+@app.options("/chat")
+async def chat_options():
+    """Handle CORS preflight for /chat endpoint."""
+    return {"message": "OK"}
+
+@app.options("/")
+async def root_options():
+    """Handle CORS preflight for root endpoint."""
+    return {"message": "OK"}
+
+@app.options("/health")
+async def health_options():
+    """Handle CORS preflight for /health endpoint."""
+    return {"message": "OK"}
+
 @app.post("/chat")
 async def chat_endpoint(request: QueryRequest):
     """Handles chat queries from frontend."""
@@ -114,3 +130,8 @@ async def chat_endpoint(request: QueryRequest):
 @app.get("/")
 async def root():
     return {"message": "✅ GIKI Chatbot API is running!"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return {"status": "ok", "message": "GIKI Chatbot API is healthy"}

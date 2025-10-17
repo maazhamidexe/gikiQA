@@ -1,0 +1,34 @@
+# --- Core Framework ---
+fastapi
+uvicorn
+gunicorn
+python-dotenv
+
+# --- LangChain + Pinecone + OpenAI + Voyage ---
+langchain
+langchain-pinecone
+openai
+pinecone-client
+requests
+
+# --- Utilities ---
+tqdm
+tenacity
+pydantic
+# --- Core Framework ---
+fastapi
+uvicorn
+gunicorn
+python-dotenv
+
+# --- LangChain + Pinecone + OpenAI + Voyage ---
+langchain
+langchain-pinecone
+openai
+pinecone-client
+requests
+
+# --- Utilities ---
+tqdm
+tenacity
+pydantic

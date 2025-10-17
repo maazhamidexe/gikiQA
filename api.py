@@ -1,5 +1,3 @@
-from fastapi import FastAPI, Request
-from pydantic import BaseModel
 import os
 import json
 import requests
@@ -30,7 +28,7 @@ def voyage_embed(texts, model="voyage-3-large"):
     payload = {
         "input": texts,
         "model": model,
-        "input_type": "document"
+        "input_type": "document"  # can be "document" or "query"
     }
 
     response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=60)
@@ -44,6 +42,7 @@ def voyage_embed(texts, model="voyage-3-large"):
 class VoyageEmbeddings:
     def embed_query(self, text):
         return voyage_embed(text)[0]
+
     def embed_documents(self, texts):
         return voyage_embed(texts)
 
@@ -74,24 +73,16 @@ qa = RetrievalQA.from_chain_type(
     retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
 )
 
-# ---------- FastAPI ----------
-app = FastAPI(title="GIKI Chatbot API", version="1.0")
+print("✅ Chatbot connected to Pinecone + Voyage AI embeddings.\nType 'exit' to quit.")
 
-class QueryRequest(BaseModel):
-    query: str
-
-@app.post("/chat")
-async def chat_endpoint(request: QueryRequest):
-    """Handles chat queries from frontend."""
-    query = request.query.strip()
-    if not query:
-        return {"error": "Empty query."}
+# ---------- Chat Loop ----------
+while True:
+    query = input("\nYou: ").strip()
+    if query.lower() in ["exit", "quit", "bye"]:
+        print("👋 Goodbye!")
+        break
     try:
         result = qa.invoke({"query": query})
-        return {"query": query, "answer": result["result"]}
+        print(f"Bot: {result['result']}")
     except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/")
-async def root():
-    return {"message": "✅ GIKI Chatbot API is running!"}
+        print(f"[Error] {e}")

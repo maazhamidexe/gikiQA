@@ -8,7 +8,7 @@ from pinecone import Pinecone
 from langchain_pinecone import PineconeVectorStore
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
-from fastapi.middleware.cors import CORSMiddlewarefrom fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 # ---------- Load environment ----------
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")

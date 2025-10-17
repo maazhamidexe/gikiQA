@@ -1,7 +1,17 @@
-# 🎓 gikiQA  
-> **An AI-powered RAG chatbot tailored for GIKI**  
-> Crawl, embed, and query GIKI's knowledge base — all in one pipeline.
+<h1 align="center">🎓 gikiQA</h1>
 
+<p align="center">
+  <em>An AI-powered RAG chatbot tailored for <strong>GIKI</strong> — enabling intelligent Q&A over campus knowledge.</em>  
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python" />
+  <img src="https://img.shields.io/badge/LangChain-Framework-orange" alt="LangChain" />
+  <img src="https://img.shields.io/badge/Pinecone-VectorDB-green" alt="Pinecone" />
+  <img src="https://img.shields.io/badge/Crawl4AI-WebScraper-yellow" alt="Crawl4AI" />
+  <img src="https://img.shields.io/badge/Ollama-Embeddings-red" alt="Ollama" />
+  <img src="https://img.shields.io/badge/FastAPI-Backend-009688" alt="FastAPI" />
+</p>
 ---
 
 ## 🧠 Overview

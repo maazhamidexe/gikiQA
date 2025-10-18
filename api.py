@@ -1,72 +1,64 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from pydantic import BaseModel
 import os
-import json
-import requests
 from dotenv import load_dotenv
 from pinecone import Pinecone
 from langchain_pinecone import PineconeVectorStore
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
 from fastapi.middleware.cors import CORSMiddleware
-
 
 # ---------- Load environment ----------
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 
-# ---------- Voyage AI Embedding Function ----------
-def voyage_embed(texts, model="voyage-3-large"):
-    """Embed text(s) using Voyage AI API (1024-dim)."""
-    if isinstance(texts, str):
-        texts = [texts]
-
-    url = "https://api.voyageai.com/v1/embeddings"
-    headers = {
-        "Authorization": f"Bearer {VOYAGE_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "input": texts,
-        "model": model,
-        "input_type": "document"
-    }
-
-    response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=60)
-    if response.status_code != 200:
-        raise RuntimeError(f"Voyage embedding error: {response.text}")
-
-    data = response.json()
-    return [item["embedding"] for item in data.get("data", [])]
-
-# ---------- Embedding Wrapper ----------
-class VoyageEmbeddings:
-    def embed_query(self, text):
-        return voyage_embed(text)[0]
-    def embed_documents(self, texts):
-        return voyage_embed(texts)
-
-embed_model = VoyageEmbeddings()
+# ---------- OpenAI Embedding Model ----------
+# Must match your Pinecone index embedding dimension (1536)
+embed_model = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    openai_api_key=OPENAI_API_KEY,
+)
 
 # ---------- Pinecone setup ----------
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
-# ---------- Vector Store ----------
 vectorstore = PineconeVectorStore(
     index=index,
     embedding=embed_model,
-    text_key="text_preview",  # make sure your Pinecone entries have this field
+    text_key="text_preview",  # Must match what you used during ingestion
 )
 
 # ---------- LLM setup ----------
 llm = ChatOpenAI(
-    model_name="gpt-4o-mini",
+    model="gpt-4o",
     temperature=0.3,
     openai_api_key=OPENAI_API_KEY,
+)
+
+# ---------- Custom RAG Prompt ----------
+prompt_template = """
+You are GIKI's intelligent assistant designed to help students, staff, and visitors
+with accurate and friendly answers about the Ghulam Ishaq Khan Institute of Engineering Sciences and Technology (GIKI).
+
+Use the retrieved context to answer the question clearly and precisely.
+If the answer isn't found in the context, politely say you are not sure and
+suggest contacting the relevant department.
+
+--- Context ---
+{context}
+--- Question ---
+{question}
+
+Now, provide your answer as GIKI’s official assistant:
+"""
+
+prompt = PromptTemplate(
+    input_variables=["context", "question"],
+    template=prompt_template,
 )
 
 # ---------- QA Chain ----------
@@ -74,13 +66,13 @@ qa = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
     retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
+    chain_type_kwargs={"prompt": prompt},
 )
 
 # ---------- FastAPI ----------
-app = FastAPI(title="GIKI Chatbot API", version="1.0")
+app = FastAPI(title="GIKI Chatbot API", version="2.0")
 
-from fastapi.middleware.cors import CORSMiddleware
-
+# ---------- CORS ----------
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
@@ -96,23 +88,22 @@ app.add_middleware(
     max_age=86400,
 )
 
+# ---------- Request Model ----------
 class QueryRequest(BaseModel):
     query: str
 
-# Add explicit OPTIONS handlers for CORS preflight requests
+# ---------- API Routes ----------
+@app.get("/")
+async def root():
+    return {"message": "✅ GIKI Chatbot API is running!"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "GIKI Chatbot API is healthy"}
+
 @app.options("/chat")
 async def chat_options():
     """Handle CORS preflight for /chat endpoint."""
-    return {"message": "OK"}
-
-@app.options("/")
-async def root_options():
-    """Handle CORS preflight for root endpoint."""
-    return {"message": "OK"}
-
-@app.options("/health")
-async def health_options():
-    """Handle CORS preflight for /health endpoint."""
     return {"message": "OK"}
 
 @app.post("/chat")
@@ -126,12 +117,3 @@ async def chat_endpoint(request: QueryRequest):
         return {"query": query, "answer": result["result"]}
     except Exception as e:
         return {"error": str(e)}
-
-@app.get("/")
-async def root():
-    return {"message": "✅ GIKI Chatbot API is running!"}
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for monitoring."""
-    return {"status": "ok", "message": "GIKI Chatbot API is healthy"}

@@ -1,11 +1,10 @@
 import os
-import json
-import requests
 from dotenv import load_dotenv
 from pinecone import Pinecone
 from langchain_pinecone import PineconeVectorStore
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
 
 # ---------- Load environment ----------
 load_dotenv()
@@ -13,47 +12,50 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# ---------- Ollama Embedding Function ----------
-def ollama_embed(texts):
-    """Embed a list of texts using local Ollama model."""
-    if isinstance(texts, str):
-        texts = [texts]
-    response = requests.post(
-        "http://localhost:11434/api/embed",
-        headers={"Content-Type": "application/json"},
-        data=json.dumps({"model": "mxbai-embed-large", "input": texts}),
-        timeout=60,
-    )
-    if response.status_code != 200:
-        raise RuntimeError(f"Ollama embedding error: {response.text}")
-    data = response.json()
-    return data["embeddings"]
-
-# ---------- Embedding Wrapper ----------
-class OllamaEmbeddings:
-    def embed_query(self, text):
-        return ollama_embed(text)[0]
-    def embed_documents(self, texts):
-        return ollama_embed(texts)
-
-embed_model = OllamaEmbeddings()
+# ---------- OpenAI Embedding Model ----------
+# ✅ Must match your Pinecone index embedding dimension (1536)
+embed_model = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    openai_api_key=OPENAI_API_KEY,
+)
 
 # ---------- Pinecone setup ----------
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
-# Tell LangChain to use `text_preview` instead of `text`
 vectorstore = PineconeVectorStore(
     index=index,
     embedding=embed_model,
-    text_key="text_preview",  # 👈 important fix
+    text_key="text_preview",  # Must match what you used during ingestion
 )
 
 # ---------- LLM setup ----------
 llm = ChatOpenAI(
-    model_name="gpt-4o-mini",
+    model="gpt-4o",
     temperature=0.3,
     openai_api_key=OPENAI_API_KEY,
+)
+
+# ---------- Custom RAG Prompt ----------
+prompt_template = """
+You are GIKI's intelligent assistant designed to help students, staff, and visitors
+with accurate and friendly answers about the Ghulam Ishaq Khan Institute of Engineering Sciences and Technology (GIKI).
+
+Use the retrieved context to answer the question clearly and precisely.
+If the answer isn't found in the context, politely say you are not sure and
+suggest contacting the relevant department.
+
+--- Context ---
+{context}
+--- Question ---
+{question}
+
+Now, provide your answer as GIKI’s official assistant:
+"""
+
+prompt = PromptTemplate(
+    input_variables=["context", "question"],
+    template=prompt_template,
 )
 
 # ---------- QA Chain ----------
@@ -61,9 +63,10 @@ qa = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
     retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
+    chain_type_kwargs={"prompt": prompt},
 )
 
-print("✅ Chatbot connected to Pinecone and ready.\nType 'exit' to quit.")
+print("✅ GIKI Chatbot connected to Pinecone and ready.\nType 'exit' to quit.")
 
 # ---------- Chat Loop ----------
 while True:
@@ -72,7 +75,6 @@ while True:
         print("👋 Goodbye!")
         break
     try:
-        # use .invoke() instead of .run() (modern LangChain)
         result = qa.invoke({"query": query})
         print(f"Bot: {result['result']}")
     except Exception as e:
